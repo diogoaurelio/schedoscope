@@ -81,6 +81,31 @@ class SchedoscopeServiceImpl(actorSystem: ActorSystem, settings: SchedoscopeSett
     }
   }
 
+  private def getPackageViewClasses(packageName:String):Future[Seq[Class[View]]] = Future {
+      val result = View.viewsInPackage(packageName)
+      result match {
+        case x :: xs => result
+        case x :: Nil => Seq(x)
+        case Nil => throw new IllegalArgumentException(s"No class for package ${packageName} found")
+      }
+  }
+
+  /**
+    * Convenience method for DRYing views
+    */
+  private def getViewStatusListResponses(viewUrlPath: Option[String],
+                                         status: Option[String],
+                                         filter: Option[String],
+                                         dependencies: Option[Boolean],
+                                         overview: Option[Boolean],
+                                         all: Option[Boolean]):Future[ViewStatusList] = {
+
+    getViewStatus(viewUrlPath, status, filter, dependencies.getOrElse(false)).map {
+      viewStatusResponses =>
+        viewStatusListFromStatusResponses(viewStatusResponses, dependencies, overview, all)
+    }
+  }
+
   /**
     * Convenience method for DRYing viewStatusListFromStatusResponses
     */
@@ -271,11 +296,17 @@ class SchedoscopeServiceImpl(actorSystem: ActorSystem, settings: SchedoscopeSett
   }
 
   def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String],
-            dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean]
+            dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean],
+            packageName:Option[String]=None
            ):Future[ViewStatusList] =
-    getViewStatus(viewUrlPath, status, filter, dependencies.getOrElse(false)).map { viewStatusResponses =>
-      viewStatusListFromStatusResponses(viewStatusResponses, dependencies, overview, all)
+    packageName match {
+      case Some(p) => getPackageViewClasses(p).flatMap { res =>
+        val viewUrlPaths = res map { _.getName } mkString(",")
+        getViewStatusListResponses(Some(viewUrlPaths), status, filter, dependencies, overview, all)
+      }
+      case None => getViewStatusListResponses(viewUrlPath, status, filter, dependencies, overview, all)
     }
+
 
   def transformations(status: Option[String], filter: Option[String]): Future[TransformationStatusList] = {
     val cf = Future(checkFilter(filter))

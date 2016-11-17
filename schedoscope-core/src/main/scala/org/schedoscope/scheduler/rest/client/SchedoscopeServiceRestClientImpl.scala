@@ -93,8 +93,8 @@ class SchedoscopeServiceRestClientImpl(val host: String, val port: Int) extends 
     get[ViewStatusList](s"/newdata/${viewUrlPath.getOrElse("")}", paramsFrom(("status", status), ("filter", filter)))
   }
 
-  def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean]): Future[ViewStatusList] = {
-    get[ViewStatusList](s"/views/${viewUrlPath.getOrElse("")}", paramsFrom(("status", status), ("filter", filter), ("dependencies", dependencies), ("overview", overview), ("all", all)))
+  def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean], packageName:Option[String]=None): Future[ViewStatusList] = {
+    get[ViewStatusList](s"/views/${viewUrlPath.getOrElse("")}", paramsFrom(("status", status), ("filter", filter), ("dependencies", dependencies), ("overview", overview), ("all", all), ("packagename", packageName)))
   }
 
   def transformations(status: Option[String], filter: Option[String]): Future[TransformationStatusList] = {

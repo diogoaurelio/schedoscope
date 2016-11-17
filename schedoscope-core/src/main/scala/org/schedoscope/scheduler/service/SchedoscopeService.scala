@@ -99,7 +99,7 @@ trait SchedoscopeService {
     * Throws an InvalidArgumentException if an invalid view URL pattern or regexp filter are passed.
     */
   def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean],
-            overview: Option[Boolean], all: Option[Boolean]): Future[ViewStatusList]
+            overview: Option[Boolean], all: Option[Boolean], packageName:Option[String]=None): Future[ViewStatusList]
 
   /**
     * Return the states of the transformation drivers. Transformation driver info can be filtered by transformation state or a regexp
