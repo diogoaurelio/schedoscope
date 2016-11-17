@@ -91,11 +91,15 @@ trait SchedoscopeService {
     *
     * Additionally, it can also be specified whether view states should recursively carry the states of their dependendencies.
     *
+    * In case a view does is still in initialized state, by default it will not be shown uppon .views() call. To
+    * show it nonetheless, you can pass true in param "complete"
+    *
     * Finally, there is the option to just return an overview count of views in states instead of returning the states themselves.
     *
     * Throws an InvalidArgumentException if an invalid view URL pattern or regexp filter are passed.
     */
-  def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean]): Future[ViewStatusList]
+  def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean],
+            overview: Option[Boolean], all: Option[Boolean]): Future[ViewStatusList]
 
   /**
     * Return the states of the transformation drivers. Transformation driver info can be filtered by transformation state or a regexp

@@ -68,7 +68,8 @@ class SchedoscopeRestServiceActor(schedoscope: SchedoscopeService) extends Actor
 
   val route = get {
     respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*")) {
-      parameters("status" ?, "filter" ?, "dependencies".as[Boolean] ?, "typ" ?, "mode" ?, "overview".as[Boolean] ?, "all".as[Boolean] ?) {
+      parameters("status" ?, "filter" ?, "dependencies".as[Boolean] ?, "typ" ?,
+        "mode" ?, "overview".as[Boolean] ?, "all".as[Boolean] ?, "complete".as[Boolean] ?) {
         (status, filter, dependencies, typ, mode, overview, all) =>
           path("transformations") {
             complete(schedoscope.transformations(status, filter))

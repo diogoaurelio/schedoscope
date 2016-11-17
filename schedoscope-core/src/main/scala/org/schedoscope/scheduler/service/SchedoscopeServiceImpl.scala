@@ -123,34 +123,6 @@ class SchedoscopeServiceImpl(actorSystem: ActorSystem, settings: SchedoscopeSett
         , overview =  true
       )
     }
-    /*
-    val viewStatusListWithoutViewDetails = viewStatusResponses.map {
-      v =>
-        ViewStatus(
-          viewPath = v.view.urlPath,
-          viewTableName = if (all.getOrElse(false))
-            Some(v.view.tableName)
-          else
-            None,
-          status = v.status,
-          properties = None,
-          fields = None,
-          parameters = None,
-          dependencies = if ((dependencies.getOrElse(false) || all.getOrElse(false)) && !v.view.dependencies.isEmpty)
-            Some(v.view.dependencies.map(d => (d.tableName, d.urlPath)).groupBy(_._1).mapValues(_.toList.map(_._2)))
-          else
-            None,
-          transformation = None,
-          export = None,
-          storageFormat = None,
-          materializeOnce = None,
-          comment = None,
-          isTable = if (all.getOrElse(false))
-            Some(false)
-          else
-            None)
-    }
-    */
 
     lazy val viewStatusList = if (all.getOrElse(false))
       viewStatusResponses
@@ -165,28 +137,7 @@ class SchedoscopeServiceImpl(actorSystem: ActorSystem, settings: SchedoscopeSett
             , dependencies = None
             , overview = false
           )
-
-          /*
-          ViewStatus(
-          viewPath = v.view.urlPathPrefix,
-          viewTableName = Option(v.view.tableName),
-          status = v.status,
-          properties = None,
-          fields = Option(v.view.fields.map(f => FieldStatus(f.n, HiveQl.typeDdl(f.t), f.comment)).toList),
-          parameters = if (!v.view.parameters.isEmpty)
-            Some(v.view.parameters.map(p => FieldStatus(p.n, p.t.runtimeClass.getSimpleName, None)).toList)
-          else
-            None,
-          dependencies = None,
-          transformation = Option(v.view.registeredTransformation().viewTransformationStatus),
-          export = Option(viewExportStatus(v.view.registeredExports.map(e => e.apply()))),
-          storageFormat = Option(v.view.storageFormat.getClass.getSimpleName),
-          materializeOnce = Option(v.view.isMaterializeOnce),
-          comment = Option(v.view.comment),
-          isTable = Option(true))
-          */
         )
-
         .toList ::: viewStatusListWithoutViewDetails
     else
       viewStatusListWithoutViewDetails
@@ -316,10 +267,12 @@ class SchedoscopeServiceImpl(actorSystem: ActorSystem, settings: SchedoscopeSett
     }
   }
 
-    def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String], dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean]) =
-      getViewStatus(viewUrlPath, status, filter, dependencies.getOrElse(false)).map { viewStatusResponses =>
-        viewStatusListFromStatusResponses(viewStatusResponses, dependencies, overview, all)
-      }
+  def views(viewUrlPath: Option[String], status: Option[String], filter: Option[String],
+            dependencies: Option[Boolean], overview: Option[Boolean], all: Option[Boolean]
+           ):Future[ViewStatusList] =
+    getViewStatus(viewUrlPath, status, filter, dependencies.getOrElse(false)).map { viewStatusResponses =>
+      viewStatusListFromStatusResponses(viewStatusResponses, dependencies, overview, all)
+    }
 
   def transformations(status: Option[String], filter: Option[String]): Future[TransformationStatusList] = {
     val cf = Future(checkFilter(filter))
