@@ -34,9 +34,9 @@ import scala.language.postfixOps
 /**
   * A driver actor manages the executions of transformations using hive, oozie etc. The actual
   * execution is done using a driver trait implementation. The driver actor code itself is transformation
-  * type agnostic. Driver actors poll the transformation tasks they execute from the transformation manager actor
-  * The polling occurs either event-driven (immediately after a previous task was completed), or upon receive
-  * of TransformationArrived message
+  * type agnostic. Driver actors ask the transformation for tasks they execute from the transformation manager actor
+  * The act of asking occurs event-driven fashion, immediately after a previous task was completed, and - only in
+  * case the driver actor is in idle state (defined as "receive") -  upon reception of a TransformationArrived message
   *
   */
 class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
@@ -66,7 +66,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
     logStateInfo("idle", "DRIVER ACTOR: initialized actor")
 
-    poll()
+    queryForNewCmd()
   }
 
   /**
@@ -78,9 +78,11 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   }
 
   /**
-    * Poll new command from transformation manager
+    * Ask transformation manager for new command
+    *
+    * Note: different from polling, as this is purely event-driven
     */
-  def poll(): Unit = {
+  def queryForNewCmd(): Unit = {
     log.info("DRIVER ACTOR: polling ActionManager for new transformation...")
     transformationManagerActor ! PollCommand(driver.transformationName)
   }
@@ -99,7 +101,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   def receive = LoggingReceive {
     case t: DriverCommand => toRunning(t)
 
-    case TransformationArrived => poll()
+    case TransformationArrived => queryForNewCmd()
   }
 
   /**
@@ -196,7 +198,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     logStateInfo("idle", "DRIVER ACTOR: becoming idle")
 
     become(receive)
-    poll()
+    queryForNewCmd()
   }
 
   /**
