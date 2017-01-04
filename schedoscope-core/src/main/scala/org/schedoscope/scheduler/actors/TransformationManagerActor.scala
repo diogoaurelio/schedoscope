@@ -160,7 +160,6 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
           enqueueTransformation(commandToExecute, transformation)
       }
 
-
     case viewToTransform: View =>
       val transformation = viewToTransform.transformation().forView(viewToTransform)
       val commandRequest = DriverCommand(TransformView(transformation, viewToTransform), sender)
@@ -174,10 +173,42 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
       enqueueDeploy(DriverCommand(deploy, sender))
   })
 
+  /**
+    * Alerts respective transformation Drivers (e.g. the workers)
+    * that new work-to-be-done has arrived, so that idle
+    * drivers can ask again for the transformation (e.g. the work/task)
+    *
+    * Note: drivers are event-driven by nature (a pollCommand is after
+    *       previous command has finished);
+    *       However, in case no task is present in the queue when
+    *       a driver actor asks for more, it will not continue
+    *       asking for work. Instead, the manager will proactively
+    *       notify idle workers of new tasks to be completed
+    *
+    * @param transformation     transformation to be executed
+    */
+
+  def alertWorkArrived(transformation: Option[String]): Unit =
+    transformation match {
+      case Some(t) =>
+        context.actorSelection(s"/schedoscope/user/transformations/${t}-*}")
+            .forward(TransformationArrived)
+        log.debug(s"TRANSFORMATIONMANAGER: Sent msg to notify " +
+          s"idle Driver actors of new transformation ${t} command arrived")
+
+      case None =>
+        context.actorSelection(s"/schedoscope/user/transformations/*}")
+          .forward(TransformationArrived)
+        log.debug("TRANSFORMATIONMANAGER: Broadcasted msg to notify " +
+          "idle Driver actors of new command arrived")
+    }
+
   def enqueueTransformation(commandToExecute: DriverCommand, transformation: Transformation): Unit = {
     val queueName = queueNameForTransformation(transformation, commandToExecute.sender)
 
     queues(queueName).enqueue(commandToExecute)
+    alertWorkArrived(Some(transformation.name))
+
     log.info(s"TRANSFORMATIONMANAGER ENQUEUE: Enqueued ${queueName} transformation${if (transformation.view.isDefined) s" for view ${transformation.view.get}" else ""}; queue size is now: ${queues.get(queueName).get.size}")
   }
 
@@ -185,6 +216,7 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
     queues.values.foreach {
       _.enqueue(driverCommand)
     }
+    alertWorkArrived(None)
     log.info("TRANSFORMATIONMANAGER ENQUEUE: Enqueued deploy action")
   }
 

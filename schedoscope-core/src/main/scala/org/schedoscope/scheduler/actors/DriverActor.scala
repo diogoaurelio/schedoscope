@@ -35,6 +35,8 @@ import scala.language.postfixOps
   * A driver actor manages the executions of transformations using hive, oozie etc. The actual
   * execution is done using a driver trait implementation. The driver actor code itself is transformation
   * type agnostic. Driver actors poll the transformation tasks they execute from the transformation manager actor
+  * The polling occurs either event-driven (immediately after a previous task was completed), or upon receive
+  * of TransformationArrived message
   *
   */
 class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
@@ -53,7 +55,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   var runningCommand: Option[DriverCommand] = None
 
   /**
-    * Start ticking upon start.
+    * Start polling upon start.
     */
   override def preStart() {
     try {
@@ -64,7 +66,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
     logStateInfo("idle", "DRIVER ACTOR: initialized actor")
 
-    tick()
+    poll()
   }
 
   /**
@@ -76,7 +78,15 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   }
 
   /**
-    * Provide continuous ticking in default state
+    * Poll new command from transformation manager
+    */
+  def poll(): Unit = {
+    log.info("DRIVER ACTOR: polling ActionManager for new transformation...")
+    transformationManagerActor ! PollCommand(driver.transformationName)
+  }
+
+  /**
+    * Provide continuous ticking when in running state
     */
   def tick() {
     system.scheduler.scheduleOnce(pingDuration, self, "tick")
@@ -89,10 +99,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   def receive = LoggingReceive {
     case t: DriverCommand => toRunning(t)
 
-    case "tick" => {
-      transformationManagerActor ! PollCommand(driver.transformationName)
-      tick()
-    }
+    case TransformationArrived => poll()
   }
 
   /**
@@ -108,7 +115,10 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     }
     // If getting a command while being busy, reschedule it by sending it to the actionsmanager
     // Should this ever happen?
-    case c: DriverCommand => transformationManagerActor ! c
+    case c: DriverCommand =>
+      log.warning(s"DRIVER ACTOR: busy, cannot execute command ${c.command}, " +
+        s"and should not have received it; re-enqueueing command!")
+      transformationManagerActor ! c
 
     // check all 10 seconds the state of the current running driver
     case "tick" => try {
@@ -126,9 +136,8 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
             case t: Throwable => {
               log.error(s"DRIVER ACTOR: Driver run for handle=${runHandle} failed because completion handler threw exception ${t}, trace ${ExceptionUtils.getStackTrace(t)}")
-              originalSender ! TransformationFailure(runHandle, DriverRunFailed[T](driver, "Completition handler failed", t))
+              originalSender ! TransformationFailure(runHandle, DriverRunFailed[T](driver, "Completion handler failed", t))
               toReceive()
-              tick()
             }
           }
 
@@ -146,7 +155,6 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
           originalSender ! TransformationSuccess(runHandle, success, viewHasData)
           toReceive()
-          tick()
         }
 
         case failure: DriverRunFailed[T] => {
@@ -163,7 +171,6 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
           originalSender ! TransformationFailure(runHandle, failure)
           toReceive()
-          tick()
         }
       }
     } catch {
@@ -178,7 +185,6 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
       }
     }
 
-
   }
 
   /**
@@ -190,6 +196,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     logStateInfo("idle", "DRIVER ACTOR: becoming idle")
 
     become(receive)
+    poll()
   }
 
   /**
@@ -211,8 +218,11 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
           driver.deployAll(ds)
           commandToRun.sender ! DeployCommandSuccess()
 
+          /* TODO: why not state change toReceive()
           logStateInfo("idle", "DRIVER ACTOR: becoming idle")
           runningCommand = None
+          */
+          toReceive()
         case TransformView(t, view) =>
           val transformation: T = t.asInstanceOf[T]
 
