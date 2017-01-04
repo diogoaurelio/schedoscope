@@ -79,14 +79,14 @@ case class DeployCommand() extends CommandRequest
 
 
 /**
-  * Used by transformation manager to notify idle driver actors to poll for a new piece of work to be executed.
+  * Used by transformation manager to notify idle driver actors to pull for a new piece of work to be executed.
   */
 case class TransformationArrived() extends CommandRequest
 
 /**
-  * Used by driver actors to poll the transformation manager actor for a new piece of work to be executed.
+  * Used by driver actors to pull the transformation manager actor for a new piece of work to be executed.
   */
-case class PollCommand(typ: String) extends CommandRequest
+case class PullCommand(typ: String) extends CommandRequest
 
 /**
   * Tells a driver actor to execute a transformation.

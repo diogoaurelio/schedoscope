@@ -61,21 +61,21 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
     val testView = ProductBrand(p("1"), p("2"), p("3"), p("4"))
     transformationManagerActor ! testView
     val command = DriverCommand(TransformView(testView.transformation(), testView), self)
-    transformationManagerActor ! PollCommand("hive")
+    transformationManagerActor ! PullCommand("hive")
     expectMsg(command)
   }
 
   it should "dequeue a deploy command" in new TransformationManagerActorTest {
     transformationManagerActor ! DeployCommand()
     val command = DriverCommand(DeployCommand(), self)
-    transformationManagerActor ! PollCommand("hive")
+    transformationManagerActor ! PullCommand("hive")
     expectMsg(command)
   }
 
   it should "dequeue a filesystem transformation" in new TransformationManagerActorTest {
     transformationManagerActor ! Touch("test")
     val command = DriverCommand(Touch("test"), self)
-    transformationManagerActor ! PollCommand("filesystem-0")
+    transformationManagerActor ! PullCommand("filesystem-0")
     expectMsg(command)
   }
 
@@ -92,7 +92,7 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
       val testView = ProductBrand(p("1"), p("2"), p("3"), p("4"))
       val command = DriverCommand(TransformView(testView.transformation(), testView), self)
       transformationManagerActor ! testView
-      transformationManagerActor ! PollCommand("hive")
+      transformationManagerActor ! PullCommand("hive")
       expectMsg(command)
       transformationManagerActor ! GetTransformations()
       expectMsg(TransformationStatusListResponse(List()))

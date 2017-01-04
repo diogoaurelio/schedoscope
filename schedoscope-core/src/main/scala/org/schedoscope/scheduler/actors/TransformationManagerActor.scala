@@ -131,7 +131,7 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
 
     case GetQueues() => sender ! QueueStatusListResponse(transformationQueueStatus())
 
-    case PollCommand(transformationType) => {
+    case PullCommand(transformationType) => {
       val queueForType = queues(queueNameForTransformationType(transformationType))
 
       if (queueForType.nonEmpty) {
@@ -178,14 +178,14 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
     * that new work-to-be-done has arrived, so that idle
     * drivers can ask again for the transformation (e.g. the work/task)
     *
-    * Note: drivers are event-driven by nature (a pollCommand is after
+    * Note: drivers are event-driven by nature (a pullCommand is after
     *       previous command has finished);
     *       However, in case no task is present in the queue when
     *       a driver actor asks for more, it will not continue
     *       asking for work. Instead, the manager will proactively
     *       notify idle workers of new tasks to be completed
     *
-    * @param transformation     transformation to be executed
+    * @param transformation     transformation name to be executed
     */
 
   def alertWorkArrived(transformation: Option[String]): Unit =
