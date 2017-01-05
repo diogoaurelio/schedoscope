@@ -57,7 +57,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
   var runningCommand: Option[DriverCommand] = None
 
   /**
-    * Start polling upon start.
+    * Start pulling upon start.
     */
   override def preStart() {
     try {

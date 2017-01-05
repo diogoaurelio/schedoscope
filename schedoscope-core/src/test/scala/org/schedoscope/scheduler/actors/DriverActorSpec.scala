@@ -5,10 +5,13 @@ import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.schedoscope.Settings
 import org.schedoscope.dsl.Parameter._
+import org.schedoscope.dsl.transformations.HiveTransformation
 import org.schedoscope.scheduler.messages._
+import org.schedoscope.schema.ddl.HiveQl
 import test.views.ProductBrand
 
 import scala.util.Random
+import scala.concurrent.duration._
 
 class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
   with FlatSpecLike
@@ -20,8 +23,6 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
   }
 
   val view = ProductBrand(p("ec0106"), p("2014"), p("01"), p("01"))
-  val brandDependency = view.dependencies.head
-  val productDependency = view.dependencies(1)
 
   val settings = Settings()
   val transformationManagerActor = TestProbe()
@@ -75,6 +76,19 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
     transformationManagerActor.expectMsg(PullCommand(t3))
   }
 
+  trait HiveActorTest {
+    val hivedriverActor = TestActorRef(DriverActor.props(settings,
+      "hive", transformationManagerActor.ref))
+    transformationManagerActor.expectMsgPF() {
+      case TransformationStatusResponse(msg, actor, driver,
+      driverHandle, driverRunStatus) => {
+        msg shouldBe "idle"
+        actor shouldBe hivedriverActor
+      }
+    }
+    transformationManagerActor.expectMsg(PullCommand("hive"))
+  }
+
   "Drivers" should "send pull on preStart and on msg TransformationArrived" in
     new DriverActorTest {
       transformationManagerActor.send(driverActor1, TransformationArrived)
@@ -85,7 +99,7 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
       transformationManagerActor.expectMsg(PullCommand(t3))
   }
 
-  "Drivers" should "change state to running when receiving a command" in
+  "Any Driver" should "run DeployCommand" in
     new DriverActorTest {
       val cmd = DriverCommand(DeployCommand(), transformationManagerActor.ref)
       transformationManagerActor.send(driverActor1, cmd)
@@ -143,6 +157,40 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
       transformationManagerActor.expectMsg(PullCommand(t3))
 
     }
+
+  "HiveDriver" should "change state to run hive transformation, " +
+    "kill it, and back into idle state" in new HiveActorTest {
+    val hiveTransformation = new HiveTransformation(HiveQl.ddl(view))
+    val cmd = DriverCommand(TransformView(hiveTransformation, view),
+      transformationManagerActor.ref)
+    transformationManagerActor.send(hivedriverActor, cmd)
+    transformationManagerActor.expectMsgPF() {
+      case TransformationStatusResponse(msg, actor, driver,
+      driverHandle, driverRunStatus) => {
+        msg shouldBe "running"
+        actor shouldBe hivedriverActor
+      }
+    }
+    // A command wrongly sent from transformation manager should be re-enqueued;
+    val cmdThoughBusy = DriverCommand(DeployCommand(), transformationManagerActor.ref)
+    transformationManagerActor.send(hivedriverActor, cmdThoughBusy)
+    transformationManagerActor.expectMsg(cmdThoughBusy)
+
+    transformationManagerActor.send(hivedriverActor, TransformationArrived)
+    // should do nothing!
+    transformationManagerActor.expectNoMsg(3 seconds)
+    // pseudo kill op
+    transformationManagerActor.send(hivedriverActor, KillCommand())
+
+    transformationManagerActor.expectMsgPF() {
+      case TransformationStatusResponse(msg, actor, driver,
+      driverHandle, driverRunStatus) => {
+        msg shouldBe "idle"
+        actor shouldBe hivedriverActor
+      }
+    }
+    transformationManagerActor.expectMsg(PullCommand("hive"))
+  }
 
 
 
