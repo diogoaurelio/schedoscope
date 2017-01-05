@@ -84,7 +84,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     *
     * Note: different from polling, as this is purely event-driven
     */
-  def pull(): Unit = {
+  def pull() {
     log.debug(s"DRIVER ACTOR: pulling new transformation (${driver.transformationName}) from transformationManager...")
     transformationManagerActor ! PullCommand(driver.transformationName)
   }
