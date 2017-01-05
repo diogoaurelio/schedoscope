@@ -225,11 +225,10 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
           driver.deployAll(ds)
           commandToRun.sender ! DeployCommandSuccess()
 
-          /* TODO: why not state change toReceive()
           logStateInfo("idle", "DRIVER ACTOR: becoming idle")
           runningCommand = None
-          */
-          toReceive()
+          pull()
+          
         case TransformView(t, view) =>
           val transformation: T = t.asInstanceOf[T]
 
