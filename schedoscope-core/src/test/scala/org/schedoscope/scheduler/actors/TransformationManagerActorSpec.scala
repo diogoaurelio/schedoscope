@@ -6,7 +6,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.schedoscope.Settings
 import org.schedoscope.dsl.Parameter._
 import org.schedoscope.dsl.transformations.Touch
-import org.schedoscope.scheduler.driver.{HiveDriver}
+import org.schedoscope.scheduler.driver.HiveDriver
 import org.schedoscope.scheduler.messages._
 import test.views.ProductBrand
 
