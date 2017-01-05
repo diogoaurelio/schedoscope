@@ -124,6 +124,10 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
         s"and should not have received it; re-enqueueing command!")
       transformationManagerActor ! c
 
+    case TransformationArrived =>
+      log.debug("DRIVER ACTOR: received notification TransformationArrived " +
+        "from transformationManager, but currently busy running transformation.")
+
     // check all 10 seconds the state of the current running driver
     case "tick" => try {
       driver.getDriverRunState(runHandle) match {

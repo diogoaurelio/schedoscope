@@ -191,13 +191,13 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
   def alertWorkArrived(transformation: Option[String]): Unit =
     transformation match {
       case Some(t) =>
-        context.actorSelection(s"/schedoscope/user/transformations/${t}-*}")
-            .forward(TransformationArrived)
+        context.actorSelection(s"${self.path.toString}/${t}*")
+          .forward(TransformationArrived)
         log.debug(s"TRANSFORMATIONMANAGER: Sent msg to notify " +
           s"idle Driver actors of new transformation ${t} command arrived")
 
       case None =>
-        context.actorSelection(s"/schedoscope/user/transformations/*}")
+        context.actorSelection(s"${self.path.toString}/*")
           .forward(TransformationArrived)
         log.debug("TRANSFORMATIONMANAGER: Broadcasted msg to notify " +
           "idle Driver actors of new command arrived")
