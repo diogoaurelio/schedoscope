@@ -23,7 +23,7 @@ import org.schedoscope.Settings
 import org.schedoscope.dsl.ExternalView
 import org.schedoscope.dsl.Parameter._
 import org.schedoscope.dsl.transformations.HiveTransformation
-import org.schedoscope.scheduler.driver.{DriverRunHandle, DriverRunSucceeded, HiveDriver}
+import org.schedoscope.scheduler.driver.{DriverRunHandle, DriverRunSucceeded}
 import org.schedoscope.scheduler.messages._
 import org.schedoscope.scheduler.states.CreatedByViewManager
 import test.views.{ProductBrand, ViewWithExternalDeps}

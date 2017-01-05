@@ -85,7 +85,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     * Note: different from polling, as this is purely event-driven
     */
   def pull(): Unit = {
-    log.info("DRIVER ACTOR: pulling new transformation from transformationManager...")
+    log.debug(s"DRIVER ACTOR: pulling new transformation (${driver.transformationName}) from transformationManager...")
     transformationManagerActor ! PullCommand(driver.transformationName)
   }
 
@@ -222,7 +222,6 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
       commandToRun.command match {
         case DeployCommand() =>
           logStateInfo("deploy", s"DRIVER ACTOR: Running Deploy command")
-
           driver.deployAll(ds)
           commandToRun.sender ! DeployCommandSuccess()
 
