@@ -114,6 +114,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     */
   def running(runHandle: DriverRunHandle[T], originalSender: ActorRef, transformingView: Option[View]): Receive = LoggingReceive {
     case KillCommand() => {
+      log.info("DRIVER ACTOR: received kill command, shutting down running op.")
       driver.killRun(runHandle)
       toReceive()
     }
@@ -236,7 +237,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
           driver.driverRunStarted(runHandle)
 
           logStateInfo("running", s"DRIVER ACTOR: Running transformation ${transformation}, configuration=${transformation.configuration}, runHandle=${runHandle}", runHandle, driver.getDriverRunState(runHandle))
-
+          tick()
           become(running(runHandle, commandToRun.sender, Some(view)))
         case t: Transformation =>
           val transformation: T = t.asInstanceOf[T]
@@ -245,7 +246,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
           driver.driverRunStarted(runHandle)
 
           logStateInfo("running", s"DRIVER ACTOR: Running transformation ${transformation}, configuration=${transformation.configuration}, runHandle=${runHandle}", runHandle, driver.getDriverRunState(runHandle))
-
+          tick()
           become(running(runHandle, commandToRun.sender, None))
       }
     } catch {
