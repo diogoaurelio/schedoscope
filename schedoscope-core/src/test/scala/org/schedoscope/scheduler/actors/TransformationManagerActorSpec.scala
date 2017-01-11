@@ -9,7 +9,7 @@ import org.schedoscope.dsl.transformations.Touch
 import org.schedoscope.scheduler.driver.HiveDriver
 import org.schedoscope.scheduler.messages._
 import test.views.ProductBrand
-
+import scala.concurrent.duration._
 
 class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
   with ImplicitSender
@@ -46,8 +46,20 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
 
         }
     })
+    val idleHiveStatus = TransformationStatusResponse("idle", hiveFakeDriver.ref, null, null, null)
+    hiveFakeDriver.send(transformationManagerActor, idleHiveStatus)
+    val idleMapRedStatus = TransformationStatusResponse("idle", mapRedFakeDriver.ref, null, null, null)
+    mapRedFakeDriver.send(transformationManagerActor, idleMapRedStatus)
+    val idleNoopStatus = TransformationStatusResponse("idle", noopFakeDriver.ref, null, null, null)
+    noopFakeDriver.send(transformationManagerActor, idleNoopStatus)
+    val idleSeqStatus = TransformationStatusResponse("idle", seqFakeDriver.ref, null, null, null)
+    seqFakeDriver.send(transformationManagerActor, idleSeqStatus)
+    val idleFSStatus = TransformationStatusResponse("idle", fsFakeDriver.ref, null, null, null)
+    fsFakeDriver.send(transformationManagerActor, idleFSStatus)
 
-    val hiveDriverActor = TestProbe()
+    val baseTransformationStatusList = TransformationStatusListResponse(
+      List(idleHiveStatus, idleNoopStatus, idleMapRedStatus, idleFSStatus, idleSeqStatus))
+
   }
 
   "the TransformationManagerActor" should "enqueue a transformation" in new TransformationManagerActorTest {
@@ -93,13 +105,47 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
       "seq" -> List())))
   }
 
-  it should "dequeue a transformation" in new TransformationManagerActorTest {
+  it should "dequeue a transformation if Driver is idle" in new TransformationManagerActorTest {
     val testView = ProductBrand(p("1"), p("2"), p("3"), p("4"))
     transformationManagerActor ! testView
+
     hiveFakeDriver.expectMsg(TransformationArrived)
     val command = DriverCommand(TransformView(testView.transformation(), testView), self)
-    transformationManagerActor ! PullCommand("hive")
-    expectMsg(command)
+
+    hiveFakeDriver.send(transformationManagerActor, PullCommand("hive"))
+    hiveFakeDriver.expectMsg(command)
+    // mark Driver as busy
+    hiveFakeDriver.send(transformationManagerActor,
+      TransformationStatusResponse("running", hiveFakeDriver.ref,
+        HiveDriver(settings.getDriverSettings("hive")), null, null))
+
+    // Should already have been dequeued:
+    transformationManagerActor ! GetQueues()
+    expectMsg(QueueStatusListResponse(Map("filesystem-0" -> List(),
+      "mapreduce" -> List(),
+      "noop" -> List(),
+      "hive" -> List(),
+      "seq" -> List())))
+
+    // Let's try again, and make sure busy Driver does not receive command even after it requested it
+    // Should NOT send command to busy actor
+    transformationManagerActor ! testView
+    hiveFakeDriver.expectMsg(TransformationArrived)
+    hiveFakeDriver.send(transformationManagerActor, PullCommand("hive"))
+    expectNoMsg(3 seconds)
+    transformationManagerActor ! GetQueues()
+    // confirm it is sitting there ...
+    expectMsg(QueueStatusListResponse(Map("filesystem-0" -> List(),
+      "mapreduce" -> List(),
+      "noop" -> List(),
+      "hive" -> List(TransformView(testView.transformation(), testView)),
+      "seq" -> List())))
+
+    hiveFakeDriver.send(transformationManagerActor,
+      TransformationStatusResponse("idle", hiveFakeDriver.ref, null, null, null))
+
+    hiveFakeDriver.send(transformationManagerActor, PullCommand("hive"))
+    hiveFakeDriver.expectMsg(command)
   }
 
   it should "dequeue a deploy command" in new TransformationManagerActorTest {
@@ -112,27 +158,38 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
     fsFakeDriver.expectMsg(TransformationArrived)
 
     val command = DriverCommand(DeployCommand(), self)
-    transformationManagerActor ! PullCommand("hive")
-    expectMsg(command)
+    // All Drivers should have a deploy command in their Queue
+    hiveFakeDriver.send(transformationManagerActor, PullCommand("hive"))
+    hiveFakeDriver.expectMsg(command)
+
+    mapRedFakeDriver.send(transformationManagerActor, PullCommand("mapreduce"))
+    mapRedFakeDriver.expectMsg(command)
+
+    noopFakeDriver.send(transformationManagerActor, PullCommand("noop"))
+    noopFakeDriver.expectMsg(command)
+
+    seqFakeDriver.send(transformationManagerActor, PullCommand("seq"))
+    seqFakeDriver.expectMsg(command)
+
+    fsFakeDriver.send(transformationManagerActor, PullCommand("filesystem-0"))
+    fsFakeDriver.expectMsg(command)
+
   }
+
 
   it should "dequeue a filesystem transformation" in new TransformationManagerActorTest {
     transformationManagerActor ! Touch("test")
     fsFakeDriver.expectMsg(TransformationArrived)
 
     val command = DriverCommand(Touch("test"), self)
-    transformationManagerActor ! PullCommand("filesystem-0")
-    expectMsg(command)
+    fsFakeDriver.send(transformationManagerActor, PullCommand("filesystem-0"))
+    fsFakeDriver.expectMsg(command)
   }
 
   it should "return the status of transformations (no running transformations)" in
     new TransformationManagerActorTest {
-      val testView = ProductBrand(p("1"), p("2"), p("3"), p("4"))
-      transformationManagerActor ! testView
-      hiveFakeDriver.expectMsg(TransformationArrived)
-
       transformationManagerActor ! GetTransformations()
-      expectMsg(TransformationStatusListResponse(List()))
+      expectMsg(baseTransformationStatusList)
     }
 
   it should "return the status of transformations" in
@@ -141,15 +198,19 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
       val command = DriverCommand(TransformView(testView.transformation(), testView), self)
       transformationManagerActor ! testView
       hiveFakeDriver.expectMsg(TransformationArrived)
+      hiveFakeDriver.send(transformationManagerActor, PullCommand("hive"))
+      hiveFakeDriver.expectMsg(command)
 
-      transformationManagerActor ! PullCommand("hive")
-      expectMsg(command)
+      val busyHiveStatus = TransformationStatusResponse("running", hiveFakeDriver.ref,
+        HiveDriver(settings.getDriverSettings("hive")), null, null)
+      hiveFakeDriver.send(transformationManagerActor, busyHiveStatus)
+
       transformationManagerActor ! GetTransformations()
-      expectMsg(TransformationStatusListResponse(List()))
-      val transformationStatusResponse = TransformationStatusResponse("running", hiveDriverActor.ref, HiveDriver(settings.getDriverSettings("hive")), null, null)
-      transformationManagerActor ! transformationStatusResponse
-      transformationManagerActor ! GetTransformations()
-      expectMsg(TransformationStatusListResponse(List(transformationStatusResponse)))
+
+      val newTransformationStatusList = TransformationStatusListResponse(
+        List(idleSeqStatus, busyHiveStatus, idleNoopStatus, idleFSStatus, idleMapRedStatus))
+      expectMsg(newTransformationStatusList)
+
     }
 
 
