@@ -137,7 +137,7 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
       val senderIdle =  driverStates.get(sender.path.toStringWithoutAddress) match {
             case Some(TransformationStatusResponse(state,_,_,_,_)) =>
               if(state == "idle") true else false
-            case _ => true
+            case _ => false
           }
 
       if (queueForType.nonEmpty && senderIdle) {
