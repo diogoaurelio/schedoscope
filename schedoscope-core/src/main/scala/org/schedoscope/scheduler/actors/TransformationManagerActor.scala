@@ -141,11 +141,11 @@ class TransformationManagerActor(settings: SchedoscopeSettings,
 
         cmd.command match {
           case TransformView(transformation, _) =>
-            log.info(s"TRANSFORMATIONMANAGER DEQUEUE: Dequeued ${transformationType} transformation${if (transformation.view.isDefined) s" for view ${transformation.view.get}" else ""}; queue size is now: ${queueForType.size}")
+            log.info(s"TRANSFORMATIONMANAGER DEQUEUE: Dequeued ${transformationType} transformation${if (transformation.view.isDefined) s" for view ${transformation.view.get}" else ""} and target Actor ${sender.path}; queue size is now: ${queueForType.size}")
           case transformation: Transformation =>
-            log.info(s"TRANSFORMATIONMANAGER DEQUEUE: Dequeued ${transformationType} transformation${if (transformation.view.isDefined) s" for view ${transformation.view.get}" else ""}; queue size is now: ${queueForType.size}")
+            log.info(s"TRANSFORMATIONMANAGER DEQUEUE: Dequeued ${transformationType} transformation${if (transformation.view.isDefined) s" for view ${transformation.view.get}" else ""} and target Actor ${sender.path}; queue size is now: ${queueForType.size}")
           case DeployCommand() =>
-            log.info("TRANSFORMATIONMANAGER DEQUEUE: Dequeued deploy action")
+            log.info(s"TRANSFORMATIONMANAGER DEQUEUE: Dequeued deploy action to target Actor ${sender.path};")
         }
       }
     }

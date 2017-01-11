@@ -121,8 +121,8 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
     // If getting a command while being busy, reschedule it by sending it to the actionsmanager
     // Should this ever happen?
     case c: DriverCommand =>
-      log.warning(s"DRIVER ACTOR: busy, cannot execute command ${c.command}, " +
-        s"and should not have received it; re-enqueueing command!")
+      log.debug(s"DRIVER ACTOR: busy, cannot execute command ${c.command}; " +
+        s"re-enqueueing it in TransformationManager")
       transformationManagerActor ! c
 
     case TransformationArrived =>
