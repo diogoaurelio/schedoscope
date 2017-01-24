@@ -13,7 +13,6 @@ import test.views.ProductBrand
 import scala.concurrent.duration._
 
 class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
-  with ImplicitSender
   with FlatSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -65,40 +64,58 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
 
   it should "forward transformations to the correct DriverManager based on incoming View" in
     new TransformationManagerActorTest {
-      val cmd = DriverCommand(TransformView(testView.transformation(), testView), self)
-      transformationManagerActor ! testView
+      val msgSender = TestProbe()
+      val cmd = DriverCommand(TransformView(testView.transformation(), testView),
+        msgSender.ref)
+      msgSender.send(transformationManagerActor,testView)
       hiveDriverRouter.expectMsg(cmd)
-
     }
 
   it should "forward transformations to the correct DriverManager based on incoming Transformation" in
     new TransformationManagerActorTest {
+      val msgSender = TestProbe()
       val filesystemTransformation = new FilesystemTransformation
-      val cmd = DriverCommand(filesystemTransformation, self)
+      val cmd = DriverCommand(filesystemTransformation,
+        msgSender.ref)
       //val command = DriverCommand(cmd, self)
-      transformationManagerActor ! filesystemTransformation
+      msgSender.send(transformationManagerActor, filesystemTransformation)
       fsDriverRouter.expectMsg(cmd)
       hiveDriverRouter.expectNoMsg(3 seconds)
-
     }
 
   it should "multicast deployCommand to routers" in
     new TransformationManagerActorTest {
-      val cmd = DriverCommand(DeployCommand(), self)
+      val msgSender = TestProbe()
+      val cmd = DriverCommand(DeployCommand(), msgSender.ref)
       //val command = DriverCommand(cmd, self)
-      transformationManagerActor ! DeployCommand()
+      msgSender.send(transformationManagerActor, DeployCommand())
       hiveDriverRouter.expectMsg(cmd)
+      hiveDriverRouter.reply(DeployCommandSuccess())
+
       mapRedDriverRouter.expectMsg(cmd)
+      mapRedDriverRouter.reply(DeployCommandSuccess())
+      msgSender.expectMsg(DeployCommandSuccess())
+
       noopDriverRouter.expectMsg(cmd)
+      noopDriverRouter.reply(DeployCommandSuccess())
+      msgSender.expectMsg(DeployCommandSuccess())
+
       seqDriverRouter.expectMsg(cmd)
+      seqDriverRouter.reply(DeployCommandSuccess())
+      msgSender.expectMsg(DeployCommandSuccess())
+
       fsDriverRouter.expectMsg(cmd)
+      fsDriverRouter.reply(DeployCommandSuccess())
+      msgSender.expectMsg(DeployCommandSuccess())
+
     }
 
   it should "return the status of transformations (no running transformations)" in
     new TransformationManagerActorTest {
-      transformationManagerActor ! GetTransformations()
+      val msgSender = TestProbe()
+      msgSender.send(transformationManagerActor, GetTransformations())
 
-      expectMsgPF() {
+      msgSender.expectMsgPF() {
         case TransformationStatusListResponse(statusList) => {
           statusList.size shouldBe 5
           statusList should contain(idleHiveStatus)
@@ -112,18 +129,20 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
 
   it should "return the status of transformations" in
     new TransformationManagerActorTest {
+      val msgSender = TestProbe()
+      val command = DriverCommand(TransformView(testView.transformation(), testView),
+        msgSender.ref)
 
-      val command = DriverCommand(TransformView(testView.transformation(), testView), self)
-      transformationManagerActor ! testView
+      msgSender.send(transformationManagerActor, testView)
       hiveDriverRouter.expectMsg(command)
 
       val busyHiveStatus = TransformationStatusResponse("running", hiveDriverRouter.ref,
         HiveDriver(settings.getDriverSettings("hive")), null, null)
       hiveDriverRouter.send(transformationManagerActor, busyHiveStatus)
 
-      transformationManagerActor ! GetTransformations()
+      msgSender.send(transformationManagerActor, GetTransformations())
 
-      expectMsgPF() {
+      msgSender.expectMsgPF() {
         case TransformationStatusListResponse(statusList) => {
           statusList.size shouldBe 5
           statusList should contain(busyHiveStatus)
@@ -135,16 +154,18 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
       }
     }
 
-  it should "bootstrap driver routers" in {
+  // integration test
+  it should "should forward to driver commands without changing the recepient" in {
+    val msgSender = TestProbe()
+    println(s"msgSender path ${msgSender.ref.path}")
     val transformationManagerActor = TestActorRef(new TransformationManagerActor(settings,
       bootstrapDriverActors = true))
-    Thread.sleep(3000)
-    transformationManagerActor ! GetTransformations()
-    expectMsgPF() {
-      case TransformationStatusListResponse(statusList) => {
-        statusList.size should be > 0
-      }
-    }
+    println(s"transformationManagerActor path ${transformationManagerActor.path}")
+    val cmd = DriverCommand(DeployCommand(), msgSender.ref)
+    //val command = DriverCommand(cmd, self)
+    msgSender.send(transformationManagerActor, cmd) //cmd
+    //expectMsg(DeployCommandSuccess())
+    msgSender.expectMsg(DeployCommandSuccess())
   }
 
 }

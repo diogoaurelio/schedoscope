@@ -54,6 +54,7 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
 
   val driverRouter = context.parent
 
+
   /**
     * Log state upon start.
     */
@@ -112,7 +113,6 @@ class DriverActor[T <: Transformation](transformationManagerActor: ActorRef,
         case success: DriverRunSucceeded[T] => {
 
           log.info(s"DRIVER ACTOR: Driver run for handle=${runHandle} succeeded.")
-
           try {
             driver.driverRunCompleted(runHandle)
           } catch {

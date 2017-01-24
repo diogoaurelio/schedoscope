@@ -15,8 +15,8 @@
   */
 package org.schedoscope.scheduler.actors
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import test.views.ProductBrand
 import org.schedoscope.dsl.Parameter._
@@ -89,7 +89,15 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
     }
   }
 
-  "All Drivers" should "run DeployCommand" in new DriverActorTest {
+  class ForwardChildActor(to: ActorRef) extends Actor {
+
+    def receive = {
+      case x => to.forward(x)
+    }
+  }
+
+
+  "All Driver Actors" should "run DeployCommand" in new DriverActorTest {
       val cmd = DriverCommand(DeployCommand(), transformationManagerActor.ref)
       transformationManagerActor.send(driverActor1, cmd)
       transformationManagerActor.expectMsgPF() {
@@ -158,13 +166,6 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
         actor shouldBe hivedriverActor
       }
     }
-    // A command wrongly sent from transformation manager should be re-enqueued;
-    val cmdThoughBusy = DriverCommand(DeployCommand(), transformationManagerActor.ref)
-    transformationManagerActor.send(hivedriverActor, cmdThoughBusy)
-    transformationManagerActor.expectMsg(cmdThoughBusy)
-
-    // should do nothing!
-    transformationManagerActor.expectNoMsg(3 seconds)
     // pseudo kill op
     transformationManagerActor.send(hivedriverActor, KillCommand())
 
@@ -175,6 +176,16 @@ class DriverActorSpec extends TestKit(ActorSystem("schedoscope"))
         actor shouldBe hivedriverActor
       }
     }
+  }
+
+
+  "Driver Actors" should "should reply to their original command senders" in {
+    val msgSender = TestProbe()
+    val transformationManagerActor = TestActorRef(new TransformationManagerActor(settings,
+      bootstrapDriverActors = true))
+    val cmd = DriverCommand(DeployCommand(), msgSender.ref)
+    system.actorSelection("akka://schedoscope/user/*") ! cmd
+    msgSender.expectMsg(DeployCommandSuccess())
   }
 
 
