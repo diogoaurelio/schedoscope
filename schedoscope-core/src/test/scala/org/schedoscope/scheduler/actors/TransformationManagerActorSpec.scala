@@ -154,17 +154,13 @@ class TransformationManagerActorSpec extends TestKit(ActorSystem("schedoscope"))
       }
     }
 
-  // integration test
+  // integration test transformationManager + DriverRouter + Drivers
   it should "should forward to driver commands without changing the recepient" in {
     val msgSender = TestProbe()
-    println(s"msgSender path ${msgSender.ref.path}")
     val transformationManagerActor = TestActorRef(new TransformationManagerActor(settings,
       bootstrapDriverActors = true))
-    println(s"transformationManagerActor path ${transformationManagerActor.path}")
     val cmd = DriverCommand(DeployCommand(), msgSender.ref)
-    //val command = DriverCommand(cmd, self)
-    msgSender.send(transformationManagerActor, cmd) //cmd
-    //expectMsg(DeployCommandSuccess())
+    msgSender.send(transformationManagerActor, cmd)
     msgSender.expectMsg(DeployCommandSuccess())
   }
 
